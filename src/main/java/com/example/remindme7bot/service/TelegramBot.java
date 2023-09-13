@@ -3,6 +3,7 @@ package com.example.remindme7bot.service;
 import com.example.remindme7bot.config.BotConfig;
 import com.example.remindme7bot.model.User;
 import com.example.remindme7bot.model.UserRepository;
+import com.vdurmont.emoji.EmojiParser;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -102,7 +103,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void startCommandReceived(long chatId, String name) {
-        String answer = "Привет, " + name + "!\nДобро пожаловать!";
+        String answer = EmojiParser.parseToUnicode("Привет, " + name + "! :blush:\nДобро пожаловать!");
         log.info("Replied to user " + name);
         sendMessage(chatId, answer);
     }
