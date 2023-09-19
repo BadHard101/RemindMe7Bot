@@ -16,7 +16,6 @@ import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import javax.xml.stream.events.Comment;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,11 +27,13 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Autowired
     private UserRepository userRepository;
 
-    private static final String HELP_TEXT = "This bot is created to demonstrate Spring capabilities.\n\n" +
-            "You can execute commands from the main menu on the left or by typing a command:\n\n" +
-            "Type /start to see a welcome message\n\n" +
-            "Type /mydata to see data stored about yourself\n\n" +
-            "Type /help to see this message again";
+    private static final String HELP_TEXT = "Список команд:\n" +
+            "Команда /start - приветственное сообщение\n" +
+            "Команда /new - создать новую задачу\n" +
+            "Команда /todo - посмотреть список задач\n" +
+            "Команда /notify - настроить уведомления\n" +
+            "Чтобы редактировать задачу доcтаточно просто ввести " +
+            "её номер в списке. Например /2 (Можно без \"/\")";
 
     final BotConfig config;
 
@@ -40,10 +41,12 @@ public class TelegramBot extends TelegramLongPollingBot {
         this.config = config;
         List<BotCommand> listOfCommands = new ArrayList<>();
         listOfCommands.add(new BotCommand("/start","Начать общение с ботом"));
-        listOfCommands.add(new BotCommand("/mydata","Получить информацию о себе"));
-        listOfCommands.add(new BotCommand("/deletedata","Удалить информацию о себе"));
         listOfCommands.add(new BotCommand("/help","Список комманд"));
-        listOfCommands.add(new BotCommand("/settings","Настройки"));
+        listOfCommands.add(new BotCommand("/new", "Новая задача"));
+        listOfCommands.add(new BotCommand("/todo", "Список задач"));
+        listOfCommands.add(new BotCommand("/1","Редактировать задачу 1"));
+        listOfCommands.add(new BotCommand("/2","Редактировать задачу 2"));
+        listOfCommands.add(new BotCommand("/notify","Настроить уведомления"));
         try {
             this.execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
         }
@@ -71,7 +74,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             switch (messageText) {
                 case "/start":
-
                     registerUser(update.getMessage());
                     startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
                     break;
@@ -79,9 +81,19 @@ public class TelegramBot extends TelegramLongPollingBot {
                     sendMessage(chatId, HELP_TEXT);
                     break;
                 default:
-                    sendMessage(chatId, "Простите, команда не распознана");
+                    try {
+                        taskNumberReceived(chatId, Integer.parseInt(messageText.replace("/", "")));
+                        log.info("taskNumberReceived by User: " + update.getMessage().getChat().getFirstName());
+                    } catch (NumberFormatException ignored) {
+                        sendMessage(chatId, "Простите, команда не распознана");
+                    }
             }
         }
+    }
+
+    private void taskNumberReceived(long chatId, Integer num) {
+        sendMessage(chatId, "Получен номер задачи: " + num);
+        //log.info();
     }
 
     private void registerUser(Message msg) {
@@ -103,9 +115,23 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void startCommandReceived(long chatId, String name) {
-        String answer = EmojiParser.parseToUnicode("Привет, " + name + "! :blush:\nДобро пожаловать!");
-        log.info("Replied to user " + name);
+        String answer;
+        answer = EmojiParser.parseToUnicode(
+                "Привет, " + name + "! Я RemindMe7 :zap:\n" +
+                        "Я помогу тебе вести свой TODO-лист задач.\n\n" +
+                        "Ты будешь создавать задачи :pushpin:, а я буду:\n" +
+                        " - следить за их дедлайнами\n" +
+                        " - структурировать их по времени\n" +
+                        " - напоминать о важных :exclamation:\n"
+        );
         sendMessage(chatId, answer);
+        answer = EmojiParser.parseToUnicode(
+                "Давай создадим твою первую задачу, " +
+                        "для этого нажми кнопку «Создать» на клавиатуре " +
+                        "или просто введи команду /new."
+        );
+        sendMessage(chatId, answer);
+        log.info("Replied to user " + name);
     }
 
     private void sendMessage(long chatId, String textToSend) {
