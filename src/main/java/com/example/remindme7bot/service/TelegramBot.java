@@ -9,6 +9,7 @@ import com.example.remindme7bot.repository.UserRepository;
 import com.vdurmont.emoji.EmojiParser;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
@@ -20,7 +21,9 @@ import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScope
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -170,7 +173,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/notify":
                 case "notify":
                 case "Уведомления":
-                    sendMessage(chatId, "Настройка уведомлений");
+                    // checkDeadlines();
+                    sendMessage(chatId, "Сейчас по Вашему тарифу «Базовый» RemindMe7Bot уведомляет Вас о" +
+                            " задачах каждый день в 12:00 за день до дедлайна (для обычной задачи) и за 2 дня и за " +
+                            "день до дедлайна (для важной задачи).\nЧтобы менять время и даты уведомлений, " +
+                            "пожалуйста, оплатите подписку стоймостью 999₽ по номеру 8(916)119-25-55");
                     break;
                 default:
                     // проверяем не хотел ли пользователь изменить какую-то задачу под определенным номером
@@ -477,4 +484,44 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.error("Error occurred: " + e.getMessage());
         }
     }
+
+    /*// Храним дату последней проверки дедлайнов, чтобы знать, когда нужно снова проверять
+    private LocalDate lastCheckDate = LocalDate.now();*/
+
+    public void checkDeadlines() {
+        LocalDate currentDate = LocalDate.now();
+
+        /*// Проверяем, прошло ли уже достаточно времени с момента последней проверки (например, 1 день)
+        if (currentDate.isAfter(lastCheckDate.plusDays(1))) {*/
+            // Получаем все задачи с дедлайном
+            List<Todo> todosWithDeadline = todoRepository.findAllByDeadlineIsNotNull();
+            // Проверяем каждую задачу
+            for (Todo todo : todosWithDeadline) {
+                LocalDate deadline = todo.getDeadline();
+
+                // Если дедлайн через 1 день (обычная задача)
+                if (deadline.equals(currentDate.plusDays(1))) {
+                    // Отправляем напоминание пользователю
+                    Long chatId = todo.getUser().getChatId();
+                    sendMessage(chatId, "У вас есть задача «" + todo.getTitle() + "», которая завтра должна быть выполнена!");
+                }
+                // Если дедлайн через 2 дня (важные задачи)
+                if (todo.getImportant() && deadline.equals(currentDate.plusDays(2))) {
+                    // Отправляем отдельное уведомление для важных задач
+                    Long chatId = todo.getUser().getChatId();
+                    sendMessage(chatId, "Внимание! У вас есть важная задача «" + todo.getTitle() + "», которая должна быть выполнена через 2 дня!");
+                }
+            }
+
+            /*// Обновляем дату последней проверки
+            lastCheckDate = currentDate;
+        }*/
+    }
+
+    // Помечаем метод как запускаемый по расписанию
+    @Scheduled(cron = "0 0 12 * * ?") // Запускать ежедневно в 12:00
+    public void scheduledCheckDeadlines() {
+        checkDeadlines();
+    }
+
 }

@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface TodoRepository extends CrudRepository<Todo, Long> {
     List<Todo> findAllByUser_ChatId(Long chatId);
+    List<Todo> findAllByDeadlineIsNotNull();
 }
