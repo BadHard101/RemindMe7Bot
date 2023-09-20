@@ -219,7 +219,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                 return;
             }
 
-            String answer = "Задача №" + todo.getSeqNumber() + " :zap:\n\n" +
+            String answer = "";
+            // если задача "важная", то добавляем эмодци
+            if (todo.getImportant()) answer += ":exclamation: Важная з";
+            else answer += "З";
+            answer += "адача №" + todo.getSeqNumber() + " :pushpin:\n\n" +
                     "Название: " + todo.getTitle() + "\n\n" +
                     "Описание: " + todo.getDescription();
             if (todo.getDeadline() != null) answer += "\n\nДедлайн: " + todo.getDeadline();
@@ -243,7 +247,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         try {
             Todo todo = todoRepository.findById(taskId).get();
 
-            String answer = "Задача №" + todo.getSeqNumber() + " :zap:\n\n" +
+            String answer = "";
+            // если задача "важная", то добавляем эмодци
+            if (todo.getImportant()) answer += ":exclamation: Важная з";
+            else answer += "З";
+            answer += "адача №" + todo.getSeqNumber() + " :zap:\n\n" +
                     "Название: " + todo.getTitle() + "\n\n" +
                     "Описание: " + todo.getDescription();
             if (todo.getDeadline() != null) answer += "\n\nДедлайн: " + todo.getDeadline();
@@ -301,7 +309,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
 
     private void todoListCommandReceived(Long chatId) {
-        String answer = "Список задач :pushpin::\n";
+        String answer = "Список задач :zap::\n";
 
         List<Todo> todos = todoRepository.findAllByUser_ChatId(chatId);
 
@@ -374,6 +382,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             // Очищаем состояние чата
             chatStates.remove(chatId);
             sendMessage(chatId, "Задача «" + title + "» создана!");
+            todoListCommandReceived(chatId);
             log.info("New todo task by: " + userRepository.findById(chatId));
         }
     }
