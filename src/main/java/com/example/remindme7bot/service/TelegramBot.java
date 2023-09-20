@@ -2,7 +2,8 @@ package com.example.remindme7bot.service;
 
 import com.example.remindme7bot.config.BotConfig;
 import com.example.remindme7bot.model.User;
-import com.example.remindme7bot.model.UserRepository;
+import com.example.remindme7bot.repository.TodoRepository;
+import com.example.remindme7bot.repository.UserRepository;
 import com.vdurmont.emoji.EmojiParser;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,8 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
@@ -26,6 +29,10 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Autowired
     private UserRepository userRepository;
+
+    private TodoRepository todoRepository;
+
+    private TodoService todoService;
 
     private static final String HELP_TEXT = "Список команд:\n" +
             "Команда /start - приветственное сообщение\n" +
@@ -69,7 +76,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
-            long chatId = update.getMessage().getChatId();
+            Long chatId = update.getMessage().getChatId();
 
 
             switch (messageText) {
@@ -78,7 +85,25 @@ public class TelegramBot extends TelegramLongPollingBot {
                     startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
                     break;
                 case "/help":
+                case "help":
                     sendMessage(chatId, HELP_TEXT);
+                    break;
+                case "/todo":
+                case "todo":
+                case "Лист":
+                    todoCommandReceived();
+                    sendMessage(chatId, "TODO лист");
+                    break;
+                case "/new":
+                case "new":
+                case "Новая задача":
+                    newTodoCommandReceived(chatId);
+                    sendMessage(chatId, "Новая задача");
+                    break;
+                case "/notify":
+                case "notify":
+                case "Уведомления":
+                    sendMessage(chatId, "Настройка уведомлений");
                     break;
                 default:
                     try {
@@ -89,6 +114,39 @@ public class TelegramBot extends TelegramLongPollingBot {
                     }
             }
         }
+    }
+
+    private void setDefaultKeyboard(SendMessage message) {
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        List<KeyboardRow> keyboardRows = new ArrayList<>();
+
+        KeyboardRow row = new KeyboardRow();
+        row.add("Лист");
+        keyboardRows.add(row);
+
+        row = new KeyboardRow();
+        row.add("Новая задача");
+        keyboardRows.add(row);
+
+        row = new KeyboardRow();
+        row.add("Уведомления");
+        keyboardRows.add(row);
+
+        keyboardMarkup.setKeyboard(keyboardRows);
+        message.setReplyMarkup(keyboardMarkup);
+    }
+
+    private void todoCommandReceived() {
+
+    }
+
+    private void newTodoCommandReceived(Long chatId) {
+        Update update = new Update();
+        sendMessage(chatId, "Введите название задачи");
+        String nameTodo = update.getMessage().getText();
+        sendMessage(chatId, "Введите описание задачи");
+        String descriptionTodo = update.getMessage().getText();
+        todoService.createTodo(nameTodo, descriptionTodo, chatId);
     }
 
     private void taskNumberReceived(long chatId, Integer num) {
@@ -134,10 +192,14 @@ public class TelegramBot extends TelegramLongPollingBot {
         log.info("Replied to user " + name);
     }
 
+
+
     private void sendMessage(long chatId, String textToSend) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
+
+        setDefaultKeyboard(message);
 
         try {
             execute(message);
