@@ -25,10 +25,13 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
@@ -42,6 +45,9 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Autowired
     private TodoService todoService;
+
+    @Autowired
+    private KeyboardSetups keyboardSetups;
 
     private Map<Long, ChatState> chatStates = new HashMap<>();
 
@@ -93,8 +99,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             // Получаем состояние чата
             ChatState chatState = chatStates.get(chatId);
 
-            // Если ждали ответ на создание новой задачи
-            if (chatState != null) {
+            if (chatState != null) { // Если ждали ответ на создание новой задачи
                 newTodoCommandReceived2(chatId, chatState, messageText);
                 return;
             }
@@ -136,36 +141,45 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
 
-    private void setDefaultKeyboard(SendMessage message) {
-        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-        List<KeyboardRow> keyboardRows = new ArrayList<>();
+    private void taskNumberReceived(long chatId, Integer num) {
+        try {
+            Todo todo = todoRepository.findBySeqNumber(num);
+            String answer = "Задача №" + todo.getSeqNumber() + " :zap:\n\n" +
+                    "Название: " + todo.getTitle() + "\n\n" +
+                    "Описание: " + todo.getDescription();
+            if (todo.getDeadline() != null) answer += "\n\nДедлайн: " + todo.getDeadline();
+            answer = EmojiParser.parseToUnicode(answer);
+            sendMessage(chatId, answer);
 
-        KeyboardRow row = new KeyboardRow();
-        row.add("Лист");
-        keyboardRows.add(row);
+            ChatState chatState = new ChatState();
+            chatState.setEditTask(true);
+            chatStates.put(chatId, chatState);
+            sendMessage(chatId, "Что вы хотите изменить?");
+        } catch (Exception e) {
+            sendMessage(chatId, "Нет задачи с таким номером. Проверьте /todo");
+        }
 
-        row = new KeyboardRow();
-        row.add("Новая задача");
-        keyboardRows.add(row);
-
-        row = new KeyboardRow();
-        row.add("Уведомления");
-        keyboardRows.add(row);
-
-        keyboardMarkup.setKeyboard(keyboardRows);
-        message.setReplyMarkup(keyboardMarkup);
+        //log.info();
     }
 
-    private void setCancelKeyboard(SendMessage message) {
-        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-        List<KeyboardRow> keyboardRows = new ArrayList<>();
+    public boolean setDeadlineFromString(Long chatId, Todo todo, String dateString) {
+        // Создаем регулярное выражение для проверки даты в формате "yyyy-MM-dd"
+        String datePattern = "\\d{4}-\\d{2}-\\d{2}";
+        Pattern pattern = Pattern.compile(datePattern);
+        Matcher matcher = pattern.matcher(dateString);
 
-        KeyboardRow row = new KeyboardRow();
-        row.add("Отменить");
-        keyboardRows.add(row);
-
-        keyboardMarkup.setKeyboard(keyboardRows);
-        message.setReplyMarkup(keyboardMarkup);
+        if (matcher.matches()) {
+            // Если дата соответствует формату, преобразуем ее в LocalDate
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            LocalDate deadline = LocalDate.parse(dateString, formatter);
+            todo.setDeadline(deadline);
+            return true;
+        } else {
+            // Если дата введена неправильно, отправляем сообщение об ошибке
+            // и подсказываем правильный формат
+            sendMessage(chatId, "Пожалуйста, введите дату в формате \"yyyy-MM-dd\".");
+            return false;
+        }
     }
 
     private void todoListCommandReceived(Long chatId) {
@@ -216,23 +230,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-
-    private void taskNumberReceived(long chatId, Integer num) {
-        try {
-            Todo todo = todoRepository.findBySeqNumber(num);
-            String answer = "Задача №" + todo.getSeqNumber() + " :zap:\n\n" +
-                    "Название: " + todo.getTitle() + "\n\n" +
-                    "Описание: " + todo.getDescription();
-            if (todo.getDeadline() != null) answer += "\n\nДедлайн: " + todo.getDeadline();
-            answer = EmojiParser.parseToUnicode(answer);
-            sendMessage(chatId, answer);
-        } catch (Exception e) {
-            sendMessage(chatId, "Нет задачи с таким номером. Проверьте /todo");
-        }
-
-        //log.info();
-    }
-
     private void registerUser(Message msg) {
         if (userRepository.findById(msg.getChatId()).isEmpty()) {
             var chatId = msg.getChatId();
@@ -271,8 +268,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         log.info("Replied to user " + name);
     }
 
-
-
     private void sendMessage(long chatId, String textToSend) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
@@ -281,8 +276,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         // Получаем состояние чата
         ChatState chatState = chatStates.get(chatId);
         // Если ждали ответ на создание новой задачи
-        if (chatState != null) setCancelKeyboard(message);
-        else setDefaultKeyboard(message);
+
+        if (chatState != null && chatState.isEditTask()) {
+            keyboardSetups.setEditTaskKeyboard(message);
+        } else if (chatState != null) keyboardSetups.setCancelKeyboard(message);
+        else keyboardSetups.setDefaultKeyboard(message);
+
+
 
         try {
             execute(message);
