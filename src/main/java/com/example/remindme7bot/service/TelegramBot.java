@@ -171,13 +171,13 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             // Теперь ожидаем описание задачи
             sendMessage(chatId, "Введите описание задачи");
-            return;
         } else {
             // Создаем задачу, используя название и описание
             todoService.createTodo(chatState.getTitle(), messageText, chatId);
+            sendMessage(chatId, "Задача «" + chatState.getTitle() + "» создана!");
             // Очищаем состояние чата
             chatStates.remove(chatId);
-            return;
+            log.info("New todo task by: " + userRepository.findById(chatId));
         }
     }
 
