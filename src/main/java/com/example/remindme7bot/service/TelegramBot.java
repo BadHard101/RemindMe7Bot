@@ -39,7 +39,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             "Команда /new - создать новую задачу\n" +
             "Команда /todo - посмотреть список задач\n" +
             "Команда /notify - настроить уведомления\n" +
-            "Чтобы редактировать задачу доcтаточно просто ввести " +
+            "Чтобы редактировать задачу достаточно просто ввести " +
             "её номер в списке. Например /2 (Можно без \"/\")";
     final BotConfig config;
     @Autowired
@@ -57,7 +57,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         this.config = config;
         List<BotCommand> listOfCommands = new ArrayList<>();
         listOfCommands.add(new BotCommand("/start", "Начать общение с ботом"));
-        listOfCommands.add(new BotCommand("/help", "Список комманд"));
+        listOfCommands.add(new BotCommand("/help", "Список команд"));
         listOfCommands.add(new BotCommand("/new", "Новая задача"));
         listOfCommands.add(new BotCommand("/todo", "Список задач"));
         listOfCommands.add(new BotCommand("/1", "Редактировать задачу 1"));
@@ -89,7 +89,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             // Получаем состояние чата
             ChatState chatState = chatStates.get(chatId);
 
-            // Если у пользователь должен ответить на что-то и это связано с редактированием задачи
+            // Если у пользователя должен ответить на что-то и это связано с редактированием задачи
             if (chatState != null && chatState.isEditingTask()) {
                 // то проверяем, изменяет ли он название
                 if (chatState.isEditingTitle()) {
@@ -339,7 +339,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             todoRepository.save(todo);
             answer += todo.getSeqNumber() + ". " + todo.getTitle() + " до " + todo.getDeadline();
 
-            // если задача "важная", то добавляем эмодци
+            // если задача "важная", то добавляем эмодзи
             if (todo.getImportant()) {
                 answer += ":exclamation:";
             }
@@ -356,7 +356,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             todoRepository.save(todo);
             answer += todo.getSeqNumber() + ". " + todo.getTitle();
 
-            // если задача "важная", то добавляем эмодци
+            // если задача "важная", то добавляем эмодзи
             if (todo.getImportant()) {
                 answer += ":exclamation:";
             }
@@ -410,7 +410,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     /**
-     * Первичная регестрация пользователя для хранения данных
+     * Первичная регистрация пользователя для хранения данных
      */
     private void registerUser(Message msg) {
         if (userRepository.findById(msg.getChatId()).isEmpty()) {
@@ -471,7 +471,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             // Если ждали ответ на создание новой задачи ставим клавиатуру с отменой действия
         } else if (chatState != null)
             keyboardSetups.setCancelKeyboard(message);
-            // иначе дифолтная клавиатура
+            // иначе дефолтная клавиатура
         else keyboardSetups.setDefaultKeyboard(message);
         // Если изменяется дедлайн, то тоже клавиатура для отмены
         if (chatState != null && chatState.isEditingDeadline()) keyboardSetups.setCancelKeyboard(message);
