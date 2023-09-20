@@ -21,9 +21,7 @@ import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScope
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
-import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -185,6 +183,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         log.info("taskNumberReceived by User: " + update.getMessage().getChat().getFirstName());
                     } catch (NumberFormatException ignored) {
                         sendMessage(chatId, "Простите, команда не распознана");
+                        log.warn("Wrong command by: " + userRepository.findById(chatId));
                     }
             }
         }
@@ -198,6 +197,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         todo.setTitle(title);
         todoRepository.save(todo);
         chatStates.remove(chatId);
+        log.info(todo.getUser().getUserName() + " set new title");
     }
 
     /**
@@ -208,6 +208,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         todo.setDescription(description);
         todoRepository.save(todo);
         chatStates.remove(chatId);
+        log.info(todo.getUser().getUserName() + " set new description");
     }
 
     /**
@@ -217,6 +218,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         Todo todo = todoRepository.findById(taskId).get();
         todo.setImportant(!todo.getImportant());
         todoRepository.save(todo);
+        log.info(todo.getUser().getUserName() + " made task important");
         return todo.getImportant();
     }
 
@@ -238,6 +240,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             taskNumberReceivedHelp(chatId, todo);
         } catch (Exception e) {
             sendMessage(chatId, "Нет задачи с таким номером. Проверьте /todo");
+            log.warn("Wrong deadline by: " + userRepository.findById(chatId));
         }
     }
 
@@ -251,6 +254,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             taskNumberReceivedHelp(chatId, todo);
         } catch (Exception e) {
             sendMessage(chatId, "Нет задачи с таким номером. Проверьте /todo");
+            log.warn("Wrong task number by: " + userRepository.findById(chatId));
         }
     }
 
@@ -274,6 +278,8 @@ public class TelegramBot extends TelegramLongPollingBot {
         chatState.setTaskId(todo.getId());
         chatStates.put(chatId, chatState);
         sendMessage(chatId, "Что вы хотите изменить?");
+        log.info(todo.getUser().getUserName() + " received task by number:"
+                + todo.getSeqNumber() + " with id: " + todo.getId());
     }
 
     /**
@@ -304,6 +310,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 deadline = LocalDate.parse(dateString, formatter);
             } catch (Exception ignore) {
                 sendMessage(chatId, "Введите корректную дату");
+                log.warn("Wrong deadline by: " + userRepository.findById(chatId));
                 return;
             }
             todo.setDeadline(deadline);
@@ -311,10 +318,12 @@ public class TelegramBot extends TelegramLongPollingBot {
             chatStates.remove(chatId);
             sendMessage(chatId, "Дедлайн задачи установлен!");
             todoListCommandReceived(chatId);
+            log.info(todo.getUser().getUserName() + " set new deadline");
         } else {
             // Если дата введена неправильно, отправляем сообщение об ошибке
             // и подсказываем правильный формат
             sendMessage(chatId, "Пожалуйста, введите дату в формате \"yyyy-mm-dd\".");
+            log.warn("Wrong deadline by: " + userRepository.findById(chatId));
         }
     }
 
@@ -366,6 +375,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         // Преобразовываем эмодзи
         answer = EmojiParser.parseToUnicode(answer);
         sendMessage(chatId, answer);
+        log.info("Todo list received by user: " + userRepository.findById(chatId));
     }
 
     /**
@@ -426,7 +436,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             user.setRegisteredAt(new Timestamp(System.currentTimeMillis()));
 
             userRepository.save(user);
-            log.info("user saved: " + user);
+            log.info("User saved: " + user);
         }
     }
 
@@ -450,7 +460,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         "или просто введи команду /new."
         );
         sendMessage(chatId, answer);
-        log.info("Replied to user " + name);
+        log.info("Start command replied to user " + name);
     }
 
     /**
@@ -511,6 +521,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     sendMessage(chatId, "Внимание! У вас есть важная задача «" + todo.getTitle() + "», которая должна быть выполнена через 2 дня!");
                 }
             }
+            log.warn("checkDeadlines() was executed");
 
             /*// Обновляем дату последней проверки
             lastCheckDate = currentDate;
