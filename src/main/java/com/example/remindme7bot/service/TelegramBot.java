@@ -173,7 +173,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/notify":
                 case "notify":
                 case "Уведомления":
-                    // checkDeadlines();
                     sendMessage(chatId, "Сейчас по Вашему тарифу «Базовый» RemindMe7Bot уведомляет Вас о" +
                             " задачах каждый день в 12:00 за день до дедлайна (для обычной задачи) и за 2 дня и за " +
                             "день до дедлайна (для важной задачи).\nЧтобы менять время и даты уведомлений, " +
