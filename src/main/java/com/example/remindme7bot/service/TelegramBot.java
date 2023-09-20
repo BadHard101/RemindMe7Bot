@@ -1,6 +1,7 @@
 package com.example.remindme7bot.service;
 
 import com.example.remindme7bot.config.BotConfig;
+import com.example.remindme7bot.model.ChatState;
 import com.example.remindme7bot.model.User;
 import com.example.remindme7bot.repository.TodoRepository;
 import com.example.remindme7bot.repository.UserRepository;
@@ -21,7 +22,9 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -30,9 +33,14 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
     private TodoRepository todoRepository;
 
+    @Autowired
     private TodoService todoService;
+
+    private Map<Long, ChatState> chatStates = new HashMap<>();
+
 
     private static final String HELP_TEXT = "Список команд:\n" +
             "Команда /start - приветственное сообщение\n" +
@@ -78,6 +86,15 @@ public class TelegramBot extends TelegramLongPollingBot {
             String messageText = update.getMessage().getText();
             Long chatId = update.getMessage().getChatId();
 
+            // Получаем состояние чата
+            ChatState chatState = chatStates.get(chatId);
+
+            // Если ждали ответ на создание новой задачи
+            if (chatState != null) {
+                newTodoCommandReceived2(chatId, chatState, messageText);
+                return;
+            }
+
 
             switch (messageText) {
                 case "/start":
@@ -97,8 +114,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/new":
                 case "new":
                 case "Новая задача":
-                    newTodoCommandReceived(chatId);
-                    sendMessage(chatId, "Новая задача");
+                    newTodoCommandReceived1(chatId);
                     break;
                 case "/notify":
                 case "notify":
@@ -140,14 +156,31 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     }
 
-    private void newTodoCommandReceived(Long chatId) {
-        Update update = new Update();
+    private void newTodoCommandReceived1(Long chatId) {
         sendMessage(chatId, "Введите название задачи");
-        String nameTodo = update.getMessage().getText();
-        sendMessage(chatId, "Введите описание задачи");
-        String descriptionTodo = update.getMessage().getText();
-        todoService.createTodo(nameTodo, descriptionTodo, chatId);
+        ChatState chatState = new ChatState();
+        chatState.setExpectingName(true);
+        chatStates.put(chatId, chatState);
     }
+
+    private void newTodoCommandReceived2(Long chatId, ChatState chatState, String messageText) {
+        if (chatState.isExpectingName()) {
+            // Этот ответ ожидался как название задачи
+            chatState.setTitle(messageText);
+            chatState.setExpectingName(false);
+
+            // Теперь ожидаем описание задачи
+            sendMessage(chatId, "Введите описание задачи");
+            return;
+        } else {
+            // Создаем задачу, используя название и описание
+            todoService.createTodo(chatState.getTitle(), messageText, chatId);
+            // Очищаем состояние чата
+            chatStates.remove(chatId);
+            return;
+        }
+    }
+
 
     private void taskNumberReceived(long chatId, Integer num) {
         sendMessage(chatId, "Получен номер задачи: " + num);
