@@ -6,6 +6,5 @@ import org.springframework.data.repository.CrudRepository;
 import java.util.List;
 
 public interface TodoRepository extends CrudRepository<Todo, Long> {
-    List<Todo> findByUser_ChatId(Long chatId);
-    Todo findBySeqNumber(Integer seqNumber);
+    List<Todo> findAllByUser_ChatId(Long chatId);
 }

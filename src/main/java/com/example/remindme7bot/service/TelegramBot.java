@@ -17,10 +17,6 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
@@ -99,7 +95,58 @@ public class TelegramBot extends TelegramLongPollingBot {
             // Получаем состояние чата
             ChatState chatState = chatStates.get(chatId);
 
-            if (chatState != null) { // Если ждали ответ на создание новой задачи
+            if (chatState != null && chatState.isEditingTask()) {
+                if (chatState.isEditingTitle()){
+                    setNewTitle(chatId, chatState.getTaskId(), messageText);
+                    sendMessage(chatId, "Название изменено!");
+                    todoListCommandReceived(chatId);
+                    return;
+                }
+                if (chatState.isEditingDescription()){
+                    setNewDescription(chatId, chatState.getTaskId(), messageText);
+                    sendMessage(chatId, "Описание изменено!");
+                    chatState.setEditingDescription(false);
+                    taskNumberReceived(chatId, chatState.getTaskId());
+                    return;
+                }
+                if (chatState.isEditingDeadline()){
+                    setDeadlineFromString(chatId, chatState.getTaskId(), messageText);
+                    return;
+                }
+
+                switch (messageText) {
+                    case "Название":
+                        chatState.setEditingTitle(true);
+                        sendMessage(chatId, "Введите новое название");
+                        return;
+                    case "Описание":
+                        chatState.setEditingDescription(true);
+                        sendMessage(chatId, "Введите новое описание");
+                        return;
+                    case "Дедлайн":
+                        chatState.setEditingDeadline(true);
+                        sendMessage(chatId, "Введите дату дедлайна в формате \"yyyy-mm-dd\"");
+                        return;
+                    case "Отметить важным":
+                        if (makeImportant(chatState.getTaskId()))
+                            sendMessage(chatId, "Задача отмечена как важная!");
+                        else
+                            sendMessage(chatId, "Задача больше не отмечена как важная!");
+                        chatStates.remove(chatId);
+                        todoListCommandReceived(chatId);
+                        return;
+                    case "Выполнить":
+                        todoRepository.deleteById(chatState.getTaskId());
+                        chatStates.remove(chatId);
+                        todoListCommandReceived(chatId);
+                        return;
+                    case "Назад":
+                        chatStates.remove(chatId);
+                        todoListCommandReceived(chatId);
+                        return;
+                }
+
+            } else if (chatState != null) { // Если ждали ответ на создание новой задачи
                 newTodoCommandReceived2(chatId, chatState, messageText);
                 return;
             }
@@ -140,10 +187,40 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    private void setNewDescription(Long chatId, Long taskId, String description) {
+        Todo todo = todoRepository.findById(taskId).get();
+        todo.setDescription(description);
+        todoRepository.save(todo);
+        chatStates.remove(chatId);
+    }
+
+    private void setNewTitle(Long chatId, Long taskId, String title) {
+        Todo todo = todoRepository.findById(taskId).get();
+        todo.setTitle(title);
+        todoRepository.save(todo);
+        chatStates.remove(chatId);
+    }
+
+    private boolean makeImportant(Long taskId) {
+        Todo todo = todoRepository.findById(taskId).get();
+        todo.setImportant(!todo.getImportant());
+        todoRepository.save(todo);
+        return todo.getImportant();
+    }
+
 
     private void taskNumberReceived(long chatId, Integer num) {
         try {
-            Todo todo = todoRepository.findBySeqNumber(num);
+            Todo todo = null;
+            List<Todo> todos = todoRepository.findAllByUser_ChatId(chatId);
+            for (Todo temp_todo : todos) {
+                if (temp_todo.getSeqNumber().equals(num)) todo = temp_todo;
+            }
+            if (todo == null) {
+                sendMessage(chatId, "Нет задачи с таким номером. Проверьте /todo");
+                return;
+            }
+
             String answer = "Задача №" + todo.getSeqNumber() + " :zap:\n\n" +
                     "Название: " + todo.getTitle() + "\n\n" +
                     "Описание: " + todo.getDescription();
@@ -152,7 +229,8 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMessage(chatId, answer);
 
             ChatState chatState = new ChatState();
-            chatState.setEditTask(true);
+            chatState.setEditingTask(true);
+            chatState.setTaskId(todo.getId());
             chatStates.put(chatId, chatState);
             sendMessage(chatId, "Что вы хотите изменить?");
         } catch (Exception e) {
@@ -162,7 +240,40 @@ public class TelegramBot extends TelegramLongPollingBot {
         //log.info();
     }
 
-    public boolean setDeadlineFromString(Long chatId, Todo todo, String dateString) {
+
+    private void taskNumberReceived(long chatId, Long taskId) {
+        try {
+            Todo todo = todoRepository.findById(taskId).get();
+
+            String answer = "Задача №" + todo.getSeqNumber() + " :zap:\n\n" +
+                    "Название: " + todo.getTitle() + "\n\n" +
+                    "Описание: " + todo.getDescription();
+            if (todo.getDeadline() != null) answer += "\n\nДедлайн: " + todo.getDeadline();
+            answer = EmojiParser.parseToUnicode(answer);
+            sendMessage(chatId, answer);
+
+            ChatState chatState = new ChatState();
+            chatState.setEditingTask(true);
+            chatState.setTaskId(todo.getId());
+            chatStates.put(chatId, chatState);
+            sendMessage(chatId, "Что вы хотите изменить?");
+        } catch (Exception e) {
+            sendMessage(chatId, "Нет задачи с таким номером. Проверьте /todo");
+        }
+
+        //log.info();
+    }
+
+    public void setDeadlineFromString(Long chatId, Long taskId, String dateString) {
+        if (dateString.equals("Отменить")) {
+            chatStates.remove(chatId);
+            sendMessage(chatId, "Установка дедлайна отменена");
+            taskNumberReceived(chatId, taskId);
+            return;
+        }
+
+        Todo todo = todoRepository.findById(taskId).get();
+
         // Создаем регулярное выражение для проверки даты в формате "yyyy-MM-dd"
         String datePattern = "\\d{4}-\\d{2}-\\d{2}";
         Pattern pattern = Pattern.compile(datePattern);
@@ -171,21 +282,30 @@ public class TelegramBot extends TelegramLongPollingBot {
         if (matcher.matches()) {
             // Если дата соответствует формату, преобразуем ее в LocalDate
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            LocalDate deadline = LocalDate.parse(dateString, formatter);
+            LocalDate deadline;
+            try {
+                deadline = LocalDate.parse(dateString, formatter);
+            } catch (Exception ignore) {
+                sendMessage(chatId, "Введите корректную дату");
+                return;
+            }
             todo.setDeadline(deadline);
-            return true;
+            todoRepository.save(todo);
+            chatStates.remove(chatId);
+            sendMessage(chatId, "Дедлайн задачи установлен!");
+            todoListCommandReceived(chatId);
         } else {
             // Если дата введена неправильно, отправляем сообщение об ошибке
             // и подсказываем правильный формат
-            sendMessage(chatId, "Пожалуйста, введите дату в формате \"yyyy-MM-dd\".");
-            return false;
+            sendMessage(chatId, "Пожалуйста, введите дату в формате \"yyyy-mm-dd\".");
         }
     }
+
 
     private void todoListCommandReceived(Long chatId) {
         String answer = "Список задач :pushpin::\n";
         int counter = 1;
-        for (Todo todo: todoRepository.findByUser_ChatId(chatId)) {
+        for (Todo todo: todoRepository.findAllByUser_ChatId(chatId)) {
             todo.setSeqNumber(counter++);
             todoRepository.save(todo);
             answer += todo.getSeqNumber() + ". " + todo.getTitle();
@@ -200,7 +320,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void newTodoCommandReceived1(Long chatId) {
         ChatState chatState = new ChatState();
-        chatState.setExpectingName(true);
+        chatState.setExpectingTitle(true);
         chatStates.put(chatId, chatState);
         sendMessage(chatId, "Введите название задачи");
     }
@@ -212,10 +332,10 @@ public class TelegramBot extends TelegramLongPollingBot {
             return;
         }
 
-        if (chatState.isExpectingName()) {
+        if (chatState.isExpectingTitle()) {
             // Этот ответ ожидался как название задачи
             chatState.setTitle(messageText);
-            chatState.setExpectingName(false);
+            chatState.setExpectingTitle(false);
 
             // Теперь ожидаем описание задачи
             sendMessage(chatId, "Введите описание задачи");
@@ -277,11 +397,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         ChatState chatState = chatStates.get(chatId);
         // Если ждали ответ на создание новой задачи
 
-        if (chatState != null && chatState.isEditTask()) {
+        if (chatState != null && chatState.isEditingTask()) {
             keyboardSetups.setEditTaskKeyboard(message);
         } else if (chatState != null) keyboardSetups.setCancelKeyboard(message);
         else keyboardSetups.setDefaultKeyboard(message);
-
+        if (chatState != null && chatState.isEditingDeadline()) keyboardSetups.setCancelKeyboard(message);
 
 
         try {
