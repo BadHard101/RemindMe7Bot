@@ -219,55 +219,39 @@ public class TelegramBot extends TelegramLongPollingBot {
                 return;
             }
 
-            String answer = "";
-            // если задача "важная", то добавляем эмодци
-            if (todo.getImportant()) answer += ":exclamation: Важная з";
-            else answer += "З";
-            answer += "адача №" + todo.getSeqNumber() + " :pushpin:\n\n" +
-                    "Название: " + todo.getTitle() + "\n\n" +
-                    "Описание: " + todo.getDescription();
-            if (todo.getDeadline() != null) answer += "\n\nДедлайн: " + todo.getDeadline();
-            answer = EmojiParser.parseToUnicode(answer);
-            sendMessage(chatId, answer);
-
-            ChatState chatState = new ChatState();
-            chatState.setEditingTask(true);
-            chatState.setTaskId(todo.getId());
-            chatStates.put(chatId, chatState);
-            sendMessage(chatId, "Что вы хотите изменить?");
+            taskNumberReceivedHelp(chatId, todo);
         } catch (Exception e) {
             sendMessage(chatId, "Нет задачи с таким номером. Проверьте /todo");
         }
-
-        //log.info();
     }
-
 
     private void taskNumberReceived(long chatId, Long taskId) {
         try {
             Todo todo = todoRepository.findById(taskId).get();
 
-            String answer = "";
-            // если задача "важная", то добавляем эмодци
-            if (todo.getImportant()) answer += ":exclamation: Важная з";
-            else answer += "З";
-            answer += "адача №" + todo.getSeqNumber() + " :zap:\n\n" +
-                    "Название: " + todo.getTitle() + "\n\n" +
-                    "Описание: " + todo.getDescription();
-            if (todo.getDeadline() != null) answer += "\n\nДедлайн: " + todo.getDeadline();
-            answer = EmojiParser.parseToUnicode(answer);
-            sendMessage(chatId, answer);
-
-            ChatState chatState = new ChatState();
-            chatState.setEditingTask(true);
-            chatState.setTaskId(todo.getId());
-            chatStates.put(chatId, chatState);
-            sendMessage(chatId, "Что вы хотите изменить?");
+            taskNumberReceivedHelp(chatId, todo);
         } catch (Exception e) {
             sendMessage(chatId, "Нет задачи с таким номером. Проверьте /todo");
         }
+    }
 
-        //log.info();
+    private void taskNumberReceivedHelp(Long chatId, Todo todo) {
+        String answer = "";
+        // если задача "важная", то добавляем эмодци
+        if (todo.getImportant()) answer += ":exclamation: Важная з";
+        else answer += "З";
+        answer += "адача №" + todo.getSeqNumber() + " :pushpin:\n\n" +
+                "Название: " + todo.getTitle() + "\n\n" +
+                "Описание: " + todo.getDescription();
+        if (todo.getDeadline() != null) answer += "\n\nДедлайн: " + todo.getDeadline();
+        answer = EmojiParser.parseToUnicode(answer);
+        sendMessage(chatId, answer);
+
+        ChatState chatState = new ChatState();
+        chatState.setEditingTask(true);
+        chatState.setTaskId(todo.getId());
+        chatStates.put(chatId, chatState);
+        sendMessage(chatId, "Что вы хотите изменить?");
     }
 
     public void setDeadlineFromString(Long chatId, Long taskId, String dateString) {
