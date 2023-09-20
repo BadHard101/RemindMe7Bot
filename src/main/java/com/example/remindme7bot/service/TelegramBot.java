@@ -51,6 +51,10 @@ public class TelegramBot extends TelegramLongPollingBot {
     // состояния чата для принятия ответов на сообщения
     private final Map<Long, ChatState> chatStates = new HashMap<>();
 
+    List<Long> paidChatIds = Arrays.asList(
+            1196596174L
+    );
+
     public TelegramBot(BotConfig config) {
         this.config = config;
         List<BotCommand> listOfCommands = new ArrayList<>();
@@ -143,6 +147,23 @@ public class TelegramBot extends TelegramLongPollingBot {
                         return;
                 }
 
+            } else if (chatState != null && chatState.isEditingNotify()) {
+                if (messageText.equals("Отменить")) {
+                    chatStates.remove(chatId);
+                    sendMessage(chatId, "Установка новых даты и времени уведомлений отменена.");
+                    todoListCommandReceived(chatId);
+                    return;
+                }
+
+                User user = userRepository.findById(chatId).get();
+                user.setEditNotify(messageText);
+                userRepository.save(user);
+                sendMessage(chatId, "Ваш запрос успешно принят в работу! Изменения вступят в силу " +
+                        "в течении суток.\n\nЕсли Вы хотите установить другие дату и время, еще раз введите команду " +
+                        "/notify\n\nПо любым вопросам обращайтесь по номеру оплаты: 8(916)119-25-55");
+                chatStates.remove(chatId);
+                todoListCommandReceived(chatId);
+                return;
             } else if (chatState != null) { // Если ждали ответ на создание новой задачи
                 newTodoCommandReceived2(chatId, chatState, messageText);
                 return;
@@ -171,10 +192,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/notify":
                 case "notify":
                 case "Уведомления":
-                    sendMessage(chatId, "Сейчас по Вашему тарифу «Базовый» RemindMe7Bot уведомляет Вас о" +
-                            " задачах каждый день в 12:00 за день до дедлайна (для обычной задачи), а также за 2 дня" +
-                            " и за день до дедлайна (для важной задачи).\n\nЧтобы менять время и даты уведомлений, " +
-                            "пожалуйста, оплатите подписку «Pro» стоймостью 99999₽ по номеру 8(916)119-25-55");
+                    editNotify(chatId);
                     break;
                 default:
                     // проверяем не хотел ли пользователь изменить какую-то задачу под определенным номером
@@ -186,6 +204,22 @@ public class TelegramBot extends TelegramLongPollingBot {
                         log.warn("Wrong command by: " + userRepository.findById(chatId));
                     }
             }
+        }
+    }
+
+    private void editNotify(Long chatId) {
+        if (paidChatIds.contains(chatId)) {
+            ChatState chatState = new ChatState();
+            chatState.setEditingNotify(true);
+            chatStates.put(chatId, chatState);
+            sendMessage(chatId, "У Вас оплачен тариф «Pro»!\n\nПожалуйста, напишите время и за сколько " +
+                    "дней Вы хотите получать уведомления для обычных и важных задач. Например: 8:00; 2; 1,2,3");
+        } else {
+            sendMessage(chatId, "Сейчас по Вашему тарифу «Базовый» RemindMe7Bot уведомляет Вас о" +
+                    " задачах каждый день в 12:00 за день до дедлайна (для обычной задачи), а также за 2 дня" +
+                    " и за день до дедлайна (для важной задачи).\n\nЧтобы менять время и даты уведомлений, " +
+                    "пожалуйста, оплатите подписку «Pro» стоймостью 29₽/мес. по номеру 8(916)119-25-55 с " +
+                    "указанием Вашего имени пользователя телеграмма");
         }
     }
 
@@ -512,13 +546,15 @@ public class TelegramBot extends TelegramLongPollingBot {
                 if (deadline.equals(currentDate.plusDays(1))) {
                     // Отправляем напоминание пользователю
                     Long chatId = todo.getUser().getChatId();
-                    sendMessage(chatId, "У вас есть задача «" + todo.getTitle() + "», которая завтра должна быть выполнена!");
+                    sendMessage(chatId, "У вас есть задача «" + todo.getTitle() + "», " +
+                            "которая завтра должна быть выполнена!");
                 }
                 // Если дедлайн через 2 дня (важные задачи)
                 if (todo.getImportant() && deadline.equals(currentDate.plusDays(2))) {
                     // Отправляем отдельное уведомление для важных задач
                     Long chatId = todo.getUser().getChatId();
-                    sendMessage(chatId, "Внимание! У вас есть важная задача «" + todo.getTitle() + "», которая должна быть выполнена через 2 дня!");
+                    sendMessage(chatId, "Внимание! У вас есть важная задача «" + todo.getTitle() + "», " +
+                            "которая должна быть выполнена через 2 дня!");
                 }
             }
             log.warn("checkDeadlines() was executed");

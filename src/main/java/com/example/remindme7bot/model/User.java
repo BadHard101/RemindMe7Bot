@@ -24,6 +24,8 @@ public class User{
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "user")
     private List<Todo> todoList;
 
+    private String editNotify;
+
     public User() {
     }
 

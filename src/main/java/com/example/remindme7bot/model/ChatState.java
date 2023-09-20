@@ -13,4 +13,6 @@ public class ChatState {
     private boolean editingTitle;
     private boolean editingDescription;
     private boolean editingDeadline;
+
+    private boolean editingNotify;
 }
