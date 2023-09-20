@@ -22,12 +22,10 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -304,12 +302,42 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void todoListCommandReceived(Long chatId) {
         String answer = "Список задач :pushpin::\n";
+
+        List<Todo> todos = todoRepository.findAllByUser_ChatId(chatId);
+
+        // Фильтруем задачи с deadline != null и
+        // сортируем по полю LocalDateTime
+        List<Todo> sortedTodos = todos.stream()
+                .filter(todo -> todo.getDeadline() != null)
+                .sorted(Comparator.comparing(Todo::getDeadline))
+                .collect(Collectors.toList());
+
+        // Фильтруем задачи с deadline == null
+        List<Todo> todosWithNullDeadline = todos.stream()
+                .filter(todo -> todo.getDeadline() == null)
+                .collect(Collectors.toList());
+
         int counter = 1;
-        for (Todo todo: todoRepository.findAllByUser_ChatId(chatId)) {
+        // Сначало выводем те, у которых есть дедлайн (отсортированы по дедлайну)
+        for (Todo todo: sortedTodos) {
+            todo.setSeqNumber(counter++);
+            todoRepository.save(todo);
+            answer += todo.getSeqNumber() + ". " + todo.getTitle() + " до " + todo.getDeadline();
+
+            // если задача "важная", то добавляем эмодци
+            if (todo.getImportant()) {
+                answer += ":exclamation:";
+            }
+            answer += "\n";
+        }
+        // Теперь те, которые без дедлайна
+        for (Todo todo : todosWithNullDeadline) {
             todo.setSeqNumber(counter++);
             todoRepository.save(todo);
             answer += todo.getSeqNumber() + ". " + todo.getTitle();
-            if (todo.getImportant() != null && todo.getImportant()) {
+
+            // если задача "важная", то добавляем эмодци
+            if (todo.getImportant()) {
                 answer += ":exclamation:";
             }
             answer += "\n";
