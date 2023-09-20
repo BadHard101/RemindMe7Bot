@@ -17,11 +17,14 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -132,6 +135,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+
     private void setDefaultKeyboard(SendMessage message) {
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         List<KeyboardRow> keyboardRows = new ArrayList<>();
@@ -168,7 +172,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         String answer = "Список задач :pushpin::\n";
         int counter = 1;
         for (Todo todo: todoRepository.findByUser_ChatId(chatId)) {
-            answer += counter++ + ". " + todo.getTitle();
+            todo.setSeqNumber(counter++);
+            todoRepository.save(todo);
+            answer += todo.getSeqNumber() + ". " + todo.getTitle();
             if (todo.getImportant() != null && todo.getImportant()) {
                 answer += ":exclamation:";
             }
@@ -191,6 +197,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMessage(chatId, "Создание задачи отменено");
             return;
         }
+
         if (chatState.isExpectingName()) {
             // Этот ответ ожидался как название задачи
             chatState.setTitle(messageText);
@@ -211,7 +218,18 @@ public class TelegramBot extends TelegramLongPollingBot {
 
 
     private void taskNumberReceived(long chatId, Integer num) {
-        sendMessage(chatId, "Получен номер задачи: " + num);
+        try {
+            Todo todo = todoRepository.findBySeqNumber(num);
+            String answer = "Задача №" + todo.getSeqNumber() + " :zap:\n\n" +
+                    "Название: " + todo.getTitle() + "\n\n" +
+                    "Описание: " + todo.getDescription();
+            if (todo.getDeadline() != null) answer += "\n\nДедлайн: " + todo.getDeadline();
+            answer = EmojiParser.parseToUnicode(answer);
+            sendMessage(chatId, answer);
+        } catch (Exception e) {
+            sendMessage(chatId, "Нет задачи с таким номером. Проверьте /todo");
+        }
+
         //log.info();
     }
 
