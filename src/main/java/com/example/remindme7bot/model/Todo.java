@@ -11,7 +11,7 @@ public class Todo {
     private Long id;
     private String title;
     private String description;
-    private Boolean important;
+    private Boolean important = false;
 
     @ManyToOne
     @JoinColumn(name = "user_chat_id")

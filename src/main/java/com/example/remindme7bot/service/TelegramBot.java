@@ -2,6 +2,7 @@ package com.example.remindme7bot.service;
 
 import com.example.remindme7bot.config.BotConfig;
 import com.example.remindme7bot.model.ChatState;
+import com.example.remindme7bot.model.Todo;
 import com.example.remindme7bot.model.User;
 import com.example.remindme7bot.repository.TodoRepository;
 import com.example.remindme7bot.repository.UserRepository;
@@ -108,8 +109,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/todo":
                 case "todo":
                 case "Лист":
-                    todoCommandReceived();
-                    sendMessage(chatId, "TODO лист");
+                    todoListCommandReceived(chatId);
                     break;
                 case "/new":
                 case "new":
@@ -152,18 +152,45 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.setReplyMarkup(keyboardMarkup);
     }
 
-    private void todoCommandReceived() {
+    private void setCancelKeyboard(SendMessage message) {
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        List<KeyboardRow> keyboardRows = new ArrayList<>();
 
+        KeyboardRow row = new KeyboardRow();
+        row.add("Отменить");
+        keyboardRows.add(row);
+
+        keyboardMarkup.setKeyboard(keyboardRows);
+        message.setReplyMarkup(keyboardMarkup);
+    }
+
+    private void todoListCommandReceived(Long chatId) {
+        String answer = "Список задач :pushpin::\n";
+        int counter = 1;
+        for (Todo todo: todoRepository.findByUser_ChatId(chatId)) {
+            answer += counter++ + ". " + todo.getTitle();
+            if (todo.getImportant() != null && todo.getImportant()) {
+                answer += ":exclamation:";
+            }
+            answer += "\n";
+        }
+        answer = EmojiParser.parseToUnicode(answer);
+        sendMessage(chatId, answer);
     }
 
     private void newTodoCommandReceived1(Long chatId) {
-        sendMessage(chatId, "Введите название задачи");
         ChatState chatState = new ChatState();
         chatState.setExpectingName(true);
         chatStates.put(chatId, chatState);
+        sendMessage(chatId, "Введите название задачи");
     }
 
     private void newTodoCommandReceived2(Long chatId, ChatState chatState, String messageText) {
+        if (messageText.equals("Отменить")) {
+            chatStates.remove(chatId);
+            sendMessage(chatId, "Создание задачи отменено");
+            return;
+        }
         if (chatState.isExpectingName()) {
             // Этот ответ ожидался как название задачи
             chatState.setTitle(messageText);
@@ -172,11 +199,12 @@ public class TelegramBot extends TelegramLongPollingBot {
             // Теперь ожидаем описание задачи
             sendMessage(chatId, "Введите описание задачи");
         } else {
+            String title = chatState.getTitle();
             // Создаем задачу, используя название и описание
-            todoService.createTodo(chatState.getTitle(), messageText, chatId);
-            sendMessage(chatId, "Задача «" + chatState.getTitle() + "» создана!");
+            todoService.createTodo(title, messageText, chatId);
             // Очищаем состояние чата
             chatStates.remove(chatId);
+            sendMessage(chatId, "Задача «" + title + "» создана!");
             log.info("New todo task by: " + userRepository.findById(chatId));
         }
     }
@@ -232,7 +260,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
 
-        setDefaultKeyboard(message);
+        // Получаем состояние чата
+        ChatState chatState = chatStates.get(chatId);
+        // Если ждали ответ на создание новой задачи
+        if (chatState != null) setCancelKeyboard(message);
+        else setDefaultKeyboard(message);
 
         try {
             execute(message);
