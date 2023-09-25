@@ -52,7 +52,8 @@ public class TelegramBot extends TelegramLongPollingBot {
     private final Map<Long, ChatState> chatStates = new HashMap<>();
 
     List<Long> paidChatIds = Arrays.asList(
-            1196596174L
+            1196596174L, // BadHard
+            6181330604L // Линчик
     );
 
     public TelegramBot(BotConfig config) {
@@ -194,6 +195,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "Уведомления":
                     editNotify(chatId);
                     break;
+                case "/send":
+                    secretSend(chatId);
                 default:
                     // проверяем не хотел ли пользователь изменить какую-то задачу под определенным номером
                     try {
@@ -204,6 +207,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                         log.warn("Wrong command by: " + userRepository.findById(chatId));
                     }
             }
+        }
+    }
+
+    private void secretSend(Long chatId) {
+        if (chatId.equals(1196596174L)) {
+            sendMessage(953940808L, EmojiParser.parseToUnicode("Я тебя люблю :heartpulse:, Эмилия"));
         }
     }
 
