@@ -51,10 +51,10 @@ public class TelegramBot extends TelegramLongPollingBot {
     // состояния чата для принятия ответов на сообщения
     private final Map<Long, ChatState> chatStates = new HashMap<>();
 
-    List<Long> paidChatIds = Arrays.asList(
+    /*List<Long> paidChatIds = Arrays.asList(
             1196596174L, // BadHard
             6181330604L // Линчик
-    );
+    );*/
 
     public TelegramBot(BotConfig config) {
         this.config = config;
@@ -190,11 +190,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "Новая задача":
                     newTodoCommandReceived1(chatId);
                     break;
-                case "/notify":
+                /*case "/notify":
                 case "notify":
                 case "Уведомления":
                     editNotify(chatId);
-                    break;
+                    break;*/
                 case "/send":
                     secretSend(chatId);
                 default:
@@ -216,7 +216,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void editNotify(Long chatId) {
+    /*private void editNotify(Long chatId) {
         if (paidChatIds.contains(chatId)) {
             ChatState chatState = new ChatState();
             chatState.setEditingNotify(true);
@@ -230,7 +230,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     "пожалуйста, оплатите подписку «Pro» стоймостью 29₽/мес. по номеру 8(916)119-25-55 с " +
                     "указанием Вашего имени пользователя телеграмма.");
         }
-    }
+    }*/
 
     /**
      * Метод установки и сохранения нового названия у задачи
@@ -389,13 +389,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         for (Todo todo : temp_todos) {
             todo.setSeqNumber(counter++);
             todoRepository.save(todo);
-            answer += todo.getSeqNumber() + ". " + todo.getTitle() + " до " + todo.getDeadline();
 
+            answer += todo.getSeqNumber() + ". " + todo.getDeadline() + " / ";
             // если задача "важная", то добавляем эмодзи
-            if (todo.getImportant()) {
-                answer += ":exclamation:";
-            }
-            answer += "\n";
+            if (todo.getImportant()) answer += ":exclamation:";
+            answer += todo.getTitle() + "\n";
         }
 
         // Теперь те, которые без дедлайна (deadline == null)
@@ -406,13 +404,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         for (Todo todo : temp_todos) {
             todo.setSeqNumber(counter++);
             todoRepository.save(todo);
-            answer += todo.getSeqNumber() + ". " + todo.getTitle();
 
+            answer += todo.getSeqNumber() + ". ";
             // если задача "важная", то добавляем эмодзи
             if (todo.getImportant()) {
                 answer += ":exclamation:";
             }
-            answer += "\n";
+            answer += todo.getTitle() + "\n";
         }
 
         // Преобразовываем эмодзи

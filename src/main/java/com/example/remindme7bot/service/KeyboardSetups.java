@@ -23,9 +23,9 @@ public class KeyboardSetups {
         row.add("Новая задача");
         keyboardRows.add(row);
 
-        row = new KeyboardRow();
+        /*row = new KeyboardRow();
         row.add("Уведомления");
-        keyboardRows.add(row);
+        keyboardRows.add(row);*/
 
         keyboardMarkup.setKeyboard(keyboardRows);
         message.setReplyMarkup(keyboardMarkup);
@@ -56,6 +56,7 @@ public class KeyboardSetups {
         List<KeyboardRow> keyboardRows = new ArrayList<>();
 
         KeyboardRow row = new KeyboardRow();
+        row.add("-");
         row.add("Отменить");
         keyboardRows.add(row);
 
